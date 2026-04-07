@@ -218,7 +218,7 @@ function GenerateUnpackBusModel(modelName, signalName, structInfo, referenceMode
     
     % blocks in enabled subsystem
     delete_line(get_param([subSysName '/In1'],'LineHandles').Outport(1));
-    h_bytepack = add_block('embeddedtargetslib/Host Communication/Byte Unpack', [subSysName '/ByteUnack'], 'MakeNameUnique', 'on', 'ShowName', 'off', 'Dimensions', strDimensions, 'DataTypes', strDataTypes, 'Position', [290 100 350 100+30*numel(structInfo)]);
+    h_bytepack = add_block('embeddedtargetslib/Host Communication/Byte Unpack', [subSysName '/ByteUnpack'], 'MakeNameUnique', 'on', 'ShowName', 'off', 'Dimensions', strDimensions, 'DataTypes', strDataTypes, 'Position', [290 100 350 100+30*numel(structInfo)]);
     portPositionByteUnpack = get_param(get_param(h_bytepack,'PortHandles').Inport(1),'Position');
     h_selector = add_block('simulink/Signal Routing/Selector', [subSysName '/Selector'], 'ShowName', 'off', 'InputPortWidth', '-1', 'Indices', ['1:' num2str(numBytes)], 'Position', [portPositionByteUnpack(1)-120 portPositionByteUnpack(2)-20 portPositionByteUnpack(1)-80 portPositionByteUnpack(2)+20]);
     set_param([subSysName '/In1'], 'Position', [portPositionByteUnpack(1)-235 portPositionByteUnpack(2)-7 portPositionByteUnpack(1)-205 portPositionByteUnpack(2)+7]);
