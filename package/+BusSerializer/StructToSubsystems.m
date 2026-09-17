@@ -1,4 +1,4 @@
-function StructToSubsystems(s, signalName, modelNamePrefix, outputDirectory)
+function StructToSubsystems(s, signalName, modelNamePrefix, outputDirectory, dataTypeLength)
     % Generate subsystem reference models for Simulink to use a MATLAB structure as a bus signal and implement serializers for
     % that bus. This function generates the subsystem reference models with the following meaning:
     % 
@@ -23,6 +23,10 @@ function StructToSubsystems(s, signalName, modelNamePrefix, outputDirectory)
     %                     the specified prefix string. If this parameter is not given, an empty string is used as prefix.
     % outputDirectory ... [string] Output directory, where to store all generated subsystem reference model files. If this
     %                     parameter is not given, then the current folder is returned (pwd).
+    % dataTypeLength  ... [string] The data type to be used for length inputs and outputs. The default value is 'int32'.
+    if(nargin < 5)
+        dataTypeLength = 'int32';
+    end
     if(nargin < 4)
         outputDirectory = pwd();
     end
@@ -55,12 +59,12 @@ function StructToSubsystems(s, signalName, modelNamePrefix, outputDirectory)
 
     % generate subsystem reference model: pack bus
     mPackBus = NewModel(modelNamePackBus, fileNamePackBus);
-    GeneratePackBusModel(modelNamePackBus, signalName, structInfo);
+    GeneratePackBusModel(modelNamePackBus, signalName, structInfo, dataTypeLength);
     SaveModel(mPackBus, fileNamePackBus);
 
     % generate subsystem reference model: unpack bus
     mUnpackBus = NewModel(modelNameUnpackBus, fileNameUnpackBus);
-    GenerateUnpackBusModel(modelNameUnpackBus, signalName, structInfo, modelNameDefaultBus);
+    GenerateUnpackBusModel(modelNameUnpackBus, signalName, structInfo, modelNameDefaultBus, dataTypeLength);
     SaveModel(mUnpackBus, fileNameUnpackBus);
 end
 
@@ -149,7 +153,7 @@ function GenerateDefaultBusModel(modelName, signalName, structInfo)
     end
 end
 
-function GeneratePackBusModel(modelName, signalName, structInfo)
+function GeneratePackBusModel(modelName, signalName, structInfo, dataTypeLength)
     % byte pack block
     strDataTypes = ['{''' strjoin(cellfun(@(x)(x.DataType),structInfo,'UniformOutput',false),''',''') '''}'];
     h_bytepack = add_block('embeddedtargetslib/Host Communication/Byte Pack', [modelName '/BytePack'], 'MakeNameUnique', 'on', 'ShowName', 'off');
@@ -161,10 +165,10 @@ function GeneratePackBusModel(modelName, signalName, structInfo)
     h_outbytes = add_block('simulink/Sinks/Out1', [modelName '/bytes']);
     set_param(h_outbytes, 'OutDataTypeStr', 'uint8');
     h_outlength = add_block('simulink/Sinks/Out1', [modelName '/length']);
-    set_param(h_outlength, 'OutDataTypeStr', 'uint32');
+    set_param(h_outlength, 'OutDataTypeStr', dataTypeLength);
     set_param(h_outlength, 'PortDimensions', '1');
     h_width = add_block('simulink/Signal Attributes/Width', [modelName '/Width'], 'ShowName', 'off');
-    set_param(h_width, 'DataType', 'uint32');
+    set_param(h_width, 'DataType', dataTypeLength);
     set_param(h_outbytes, 'Position', [portPositionBytePack(1)+200, portPositionBytePack(2)-7, portPositionBytePack(1)+230, portPositionBytePack(2)+7]);
     set_param(h_outlength, 'Position', [portPositionBytePack(1)+200, portPositionBytePack(2)+50, portPositionBytePack(1)+230, portPositionBytePack(2)+64]);
     set_param(h_width, 'Position', [portPositionBytePack(1)+85, portPositionBytePack(2)+40, portPositionBytePack(1)+115, portPositionBytePack(2)+70]);
@@ -187,7 +191,7 @@ function GeneratePackBusModel(modelName, signalName, structInfo)
     end
 end
 
-function GenerateUnpackBusModel(modelName, signalName, structInfo, referenceModelName)
+function GenerateUnpackBusModel(modelName, signalName, structInfo, referenceModelName, dataTypeLength)
     numBytes = GetNumberOfBytes(structInfo);
     strDimensions = ['{' strjoin(cellfun(@(x)(mat2str(x.Dimensions)),structInfo,'UniformOutput',false),',') '}'];
     strDataTypes = ['{''' strjoin(cellfun(@(x)(x.DataType),structInfo,'UniformOutput',false),''',''') '''}'];
@@ -196,9 +200,9 @@ function GenerateUnpackBusModel(modelName, signalName, structInfo, referenceMode
     % blocks at root level
     subSysName = [modelName '/unpack'];
     h_inbytes = add_block('simulink/Sources/In1', [modelName '/bytes'], 'OutDataTypeStr', 'uint8', 'Position', [0 113 30 127]);
-    h_inlength = add_block('simulink/Sources/In1', [modelName '/length'], 'OutDataTypeStr', 'uint32', 'PortDimensions', '1', 'Position', [0 13 30 27]);
+    h_inlength = add_block('simulink/Sources/In1', [modelName '/length'], 'OutDataTypeStr', dataTypeLength, 'PortDimensions', '1', 'Position', [0 13 30 27]);
     h_compare = add_block('simulink/Logic and Bit Operations/Compare To Constant', [modelName '/CompareToConstant'], 'ShowName', 'off', 'relop', '==', 'const', num2str(numBytes), 'Position', [85 10 175 30]);
-    h_width = add_block('simulink/Signal Attributes/Width', [modelName '/Width'], 'ShowName', 'off', 'DataType', 'uint32', 'Position', [85 55 115 85]);
+    h_width = add_block('simulink/Signal Attributes/Width', [modelName '/Width'], 'ShowName', 'off', 'DataType', dataTypeLength, 'Position', [85 55 115 85]);
     h_relop = add_block('simulink/Logic and Bit Operations/Relational Operator', [modelName '/RelationalOperator'], 'ShowName', 'off', 'relop', '<=', 'Position', [150 32 175 83]);
     h_and = add_block('simulink/Logic and Bit Operations/Logical Operator', [modelName '/AND'], 'ShowName', 'off', 'Inputs', '2', 'Position', [245 1 270 79]);
     h_outsuccess = add_block('simulink/Sinks/Out1', [modelName '/success'], 'OutDataTypeStr', 'boolean', 'PortDimensions', '1', 'Position', [475 33 505 47]);
